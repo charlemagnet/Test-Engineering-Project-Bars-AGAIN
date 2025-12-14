@@ -1,7 +1,7 @@
 import pytest
 import sqlite3
 # Henüz bu dosya yok, import hatası alacağız (Bu beklenen bir durum)
-# from database_manager import DatabaseManager 
+from Engines import database_manager 
 
 @pytest.fixture
 def db():
@@ -10,7 +10,7 @@ def db():
     Test bitince bağlantı kapanır.
     """
     # :memory: parametresi diske yazmadan RAM'de çalışmasını sağlar
-    manager = DatabaseManager(":memory:") 
+    manager = database_manager.DatabaseManager(":memory:") 
     manager.create_tables() # Tabloları oluşturmasını bekliyoruz
     return manager
 
