@@ -83,11 +83,11 @@ def test_successful_cancellation(reservation_system, yoga_class):
     """Tests if a reservation can be cancelled and capacity is freed up."""
     user_id = 401
     reservation_system.book_class(user_id, yoga_class)
-    assert yoga_class.current_occupancy == 1
+    pytest.assume(yoga_class.current_occupancy == 1)
 
     # Cancel the booking
     cancel_result = reservation_system.cancel_booking(user_id, yoga_class)
     
-    assert cancel_result["status"] == "cancelled"
-    assert yoga_class.current_occupancy == 0
-    assert user_id not in yoga_class.reserved_users
+    pytest.assume(cancel_result["status"] == "cancelled")
+    pytest.assume(yoga_class.current_occupancy == 0)
+    pytest.assume(user_id not in yoga_class.reserved_users)
