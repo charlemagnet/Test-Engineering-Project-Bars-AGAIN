@@ -1,6 +1,6 @@
 import pytest
 # Assuming reservation_system contains the reservation logic and GymClass
-# from reservation_system import ReservationSystem, GymClass 
+from Engines.reservation_system import ReservationSystem, GymClass 
 
 @pytest.fixture
 def reservation_system():

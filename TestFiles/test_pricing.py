@@ -1,6 +1,6 @@
 import pytest
 from pytest import approx
-# from pricing_engine import get_base_price, calculate_dynamic_price
+from Engines.pricing_engine import get_base_price, calculate_dynamic_price
 
 def test_get_base_price_yoga():
     # Güncel fiyat listesine göre 200
