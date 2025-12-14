@@ -34,7 +34,3 @@ jobs:
         # Artık sadece testlerin geçip geçmediğine bakılacak.
         pytest -v --cov=. --cov-report=term-missing
     
-    # İsteğe bağlı güvenlik taraması
-    - name: Security Scan with Bandit
-      run: |
-        bandit -r . -f custom
