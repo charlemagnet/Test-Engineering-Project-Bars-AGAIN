@@ -1,0 +1,47 @@
+name: TDD CI Pipeline
+
+# Bu workflow ne zaman çalışsın?
+# main dalına push yapıldığında veya pull request açıldığında tetiklenir.
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+    # 1. Kod deposunu sanal makineye çek
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    # 2. Python ortamını kur (3.10 veya projenize uygun sürüm)
+    - name: Set up Python 3.10
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.10"
+        cache: 'pip' # Pip paketlerini önbelleğe alarak hızı artırır
+
+    # 3. Bağımlılıkları Yükle
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+        # Eğer requirements dosyan bir alt klasördeyse yolu güncellemelisin:
+        # pip install -r path/to/requirements.txt
+
+    # 4. Testleri Çalıştır (Green kontrolü)
+    # requirements.txt içinde pytest-cov olduğu için kapsama raporu da ekledik.
+    - name: Run Tests with Pytest
+      run: |
+        # -v: detaylı çıktı
+        # --cov: kod kapsamını ölçer (mevcut klasör için)
+        # --cov-fail-under=80: Eğer test başarısı %80'in altındaysa "Red" ver (Action başarısız olsun)
+        pytest -v --cov=. --cov-report=term-missing --cov-fail-under=80
+    
+    # 5. (Opsiyonel) Güvenlik Taraması (requirements.txt'de bandit var)
+    - name: Security Scan with Bandit
+      run: |
+        bandit -r . -f custom
