@@ -25,3 +25,8 @@ def test_price_evening_surge():
     # Yoga(200) * Akşam(1.1) * Standard(1.0) = 220
     # Not: Parametrik testler akşam zammını %10 (1.1) bekliyor.
     assert calculate_dynamic_price("Yoga", 19, "Standard") == approx(220.0)
+
+def test_get_base_price_invalid():
+    """Geçersiz bir ders girildiğinde sistemin KeyError vermesini test eder."""
+    with pytest.raises(KeyError):
+        get_base_price("Tekwando")  # Listede olmayan bir ders
