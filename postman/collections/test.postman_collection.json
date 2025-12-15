@@ -1,0 +1,81 @@
+{
+  "info": {
+    "_postman_id": "2d8489e5-d387-49f9-a552-3ba1506cf13b",
+    "name": "test",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "http://127.0.0.1:8000/price",
+      "id": "32b19c71-6ce4-44f4-85df-553f6bda69e8",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://127.0.0.1:8000/price?activity=activity&hour=9&membership=Standard",
+          "protocol": "http",
+          "host": [
+            "127",
+            "0",
+            "0",
+            "1"
+          ],
+          "port": "8000",
+          "path": [
+            "price"
+          ],
+          "query": [
+            {
+              "key": "activity",
+              "value": "activity",
+              "uuid": "de4ac824-69d0-49d4-8b6c-b6f2ea0c828e"
+            },
+            {
+              "key": "hour",
+              "value": "9",
+              "uuid": "a78eb72a-33f8-49c0-b49b-26286e904de4"
+            },
+            {
+              "key": "membership",
+              "value": "Standard",
+              "uuid": "58ce47cf-5e58-4d8c-8348-8cd8a10e702e"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "http://127.0.0.1:8000/members",
+      "id": "fde29578-3a15-4ec1-b724-0b5371ed8041",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\r\n  \"id\": 999,\r\n  \"name\": \"Postman User\",\r\n  \"membership_type\": \"Premium\"\r\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "http://127.0.0.1:8000/members",
+          "protocol": "http",
+          "host": [
+            "127",
+            "0",
+            "0",
+            "1"
+          ],
+          "port": "8000",
+          "path": [
+            "members"
+          ]
+        }
+      },
+      "response": []
+    }
+  ]
+}

@@ -33,4 +33,18 @@ jobs:
         # --cov-fail-under parametresi kaldırıldı.
         # Artık sadece testlerin geçip geçmediğine bakılacak.
         pytest -v --cov=. --cov-report=term-missing
-    
+
+    - name: Install Newman
+      run: npm install -g newman
+
+        # 2. API Sunucusunu Arka Planda Başlat
+        # Sonundaki '&' işareti sunucunun arka planda çalışmasını sağlar, böylece bir sonraki adıma geçebiliriz.
+    - name: Start API Server
+      run: |
+            uvicorn main:app --host 127.0.0.1 --port 8000 &
+            sleep 5 # Sunucunun tam açılması için 5 saniye bekle
+
+        # 3. Postman Testlerini Çalıştır (Newman ile)
+        # Buradaki dosya isminin repodaki isminle AYNI olduğundan emin ol!
+    - name: Run Postman Tests with Newman
+      run: newman run "postman/collections/test.postman_collection.json"        
