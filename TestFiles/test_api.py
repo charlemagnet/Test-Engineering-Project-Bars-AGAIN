@@ -22,13 +22,12 @@ def test_get_price_yoga_morning(api_client):
     assert data["price"] == 160.0
 
 def test_get_price_invalid_activity(api_client):
-    """Geçersiz aktivite test"""
-    # membership parametresi eklendi
+    """Geçersiz aktivite girildiğinde 400 Bad Request dönmeli."""
     response = api_client.get("/price?activity=Unknown&hour=14&membership=Standard")
-    # Kodunda try-except ile 100 dönüyorsan 200, KeyError fırlatıyorsan 422 veya 500 döner.
-    # Senin kodunda KeyError fırlıyor olabilir, bu yüzden 500 veya 422 normaldir.
-    # Bu testi esnek yapıyoruz:
-    assert response.status_code in [200, 422, 500]
+    
+    # Beklenen: 400 Bad Request (Çünkü main.py artık KeyError yakalıyor)
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Gecersiz aktivite tipi"
 
 def test_create_member_api(api_client):
     """

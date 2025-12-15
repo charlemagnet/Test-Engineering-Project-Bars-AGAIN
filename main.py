@@ -84,9 +84,13 @@ def login_member(request: LoginRequest):
 
 @app.get("/price")
 def get_price(activity: str, hour: int, membership: str):
-    # Bu endpoint artık frontend'den gelen üyelik tipini kullanacak
-    price = calculate_dynamic_price(activity, hour, membership)
-    return {"price": price}
+    try:
+        # Fiyatı hesaplamaya çalış
+        price = calculate_dynamic_price(activity, hour, membership)
+        return {"price": price}
+    except KeyError:
+        # Eğer ders bulunamazsa (KeyError), 400 hatası döndür
+        raise HTTPException(status_code=400, detail="Gecersiz aktivite tipi")
 
 @app.post("/cancel_reservation")
 def cancel_reservation(request: CancellationRequest):
