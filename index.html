@@ -11,6 +11,7 @@
         .card { border: none; box-shadow: 0 10px 20px rgba(0,0,0,0.1); border-radius: 15px; }
         .hidden { display: none !important; }
         .welcome-header { background: linear-gradient(45deg, #0d6efd, #0dcaf0); color: white; padding: 20px; border-radius: 15px 15px 0 0; }
+        .admin-header { background: linear-gradient(45deg, #dc3545, #fd7e14); color: white; padding: 20px; border-radius: 15px 15px 0 0; }
         .table-responsive { max-height: 300px; overflow-y: auto; }
     </style>
 </head>
@@ -30,7 +31,7 @@
                     <label>Şifre</label>
                     <input type="password" id="loginPass" class="form-control" placeholder="******">
                 </div>
-                <button onclick="login()" class="btn btn-primary w-100 mt-auto">Giriş Yap</button>
+                <button onclick="login()" class="btn btn-primary w-100 mb-2">Giriş Yap</button>
             </div>
         </div>
 
@@ -60,10 +61,13 @@
                 <button onclick="register()" class="btn btn-success w-100 mt-auto">Kayıt Ol ve ID Al</button>
             </div>
         </div>
+
+        <div class="col-12 text-center mt-3">
+            <button onclick="showAdminPanel()" class="btn btn-outline-dark btn-sm">🔒 Admin Paneli (Veritabanı)</button>
+        </div>
     </div>
 
     <div id="dashboardSection" class="hidden">
-        
         <div class="card mb-4">
             <div class="welcome-header text-center">
                 <h2 id="welcomeMsg">Hoşgeldin!</h2>
@@ -126,31 +130,59 @@
                                 <th class="text-end">İşlem</th>
                             </tr>
                         </thead>
-                        <tbody id="myResTableBody">
-                            </tbody>
+                        <tbody id="myResTableBody"></tbody>
                     </table>
                 </div>
             </div>
         </div>
+    </div>
 
+    <div id="adminSection" class="hidden">
+        <div class="card">
+            <div class="admin-header d-flex justify-content-between align-items-center">
+                <h3 class="mb-0">🗄️ Veritabanı Görüntüleyici</h3>
+                <button onclick="closeAdminPanel()" class="btn btn-light btn-sm">Kapat</button>
+            </div>
+            <div class="card-body">
+                <div class="d-flex justify-content-between mb-3">
+                    <h5 class="text-muted">Kayıtlı Üyeler (Members Table)</h5>
+                    <button onclick="loadAllUsers()" class="btn btn-primary btn-sm">🔄 Tabloyu Yenile</button>
+                </div>
+                
+                <div class="table-responsive border rounded">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>ID</th>
+                                <th>İsim</th>
+                                <th>Üyelik Tipi</th>
+                                <th>Şifre (DB)</th> </tr>
+                        </thead>
+                        <tbody id="adminUserTable">
+                            <tr><td colspan="4" class="text-center">Yükleniyor...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="alert alert-warning mt-3 small">
+                    <i class="bi bi-info-circle"></i> Not: Şu an sadece <b>Üyeler</b> veritabanında (SQLite) tutulmaktadır. Rezervasyonlar RAM üzerinde çalışır.
+                </div>
+            </div>
+        </div>
     </div>
 
 </div>
 
 <script>
     const API_URL = "http://127.0.0.1:8000";
-    
-    // Kullanıcı verisini tarayıcı hafızasında tutuyoruz
     let currentUser = null; 
 
-    // --- 1. KAYIT OL ---
+    // --- AUTH ---
     async function register() {
         const payload = {
             name: document.getElementById('regName').value,
             password: document.getElementById('regPass').value,
             membership_type: document.getElementById('regType').value
         };
-
         try {
             const res = await fetch(`${API_URL}/register`, {
                 method: 'POST',
@@ -158,94 +190,123 @@
                 body: JSON.stringify(payload)
             });
             const data = await res.json();
-            
             if(data.status === "success") {
-                alert(`Kayıt Başarılı! Sizin ID numaranız: ${data.member_id}\nLütfen bu ID ile giriş yapın.`);
+                alert(`Kayıt Başarılı! ID: ${data.member_id}`);
                 document.getElementById('loginId').value = data.member_id;
             }
-        } catch (err) {
-            alert("Kayıt hatası!");
-        }
+        } catch (err) { alert("Kayıt hatası!"); }
     }
 
-    // --- 2. GİRİŞ YAP ---
     async function login() {
         const payload = {
             member_id: parseInt(document.getElementById('loginId').value),
             password: document.getElementById('loginPass').value
         };
-
         try {
             const res = await fetch(`${API_URL}/login`, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify(payload)
             });
-            
-            if(!res.ok) throw new Error("Giriş Başarısız");
-            
+            if(!res.ok) throw new Error();
             const data = await res.json();
             currentUser = data;
-            
             showDashboard();
-        } catch (err) {
-            alert("ID veya Şifre Hatalı!");
-        }
+        } catch (err) { alert("ID veya Şifre Hatalı!"); }
     }
 
-    // --- EKRAN GEÇİŞİ ---
+    // --- DASHBOARD ---
     function showDashboard() {
         document.getElementById('authSection').classList.add('hidden');
+        document.getElementById('adminSection').classList.add('hidden');
         document.getElementById('dashboardSection').classList.remove('hidden');
 
         document.getElementById('welcomeMsg').innerText = `Hoşgeldin, ${currentUser.name}`;
         document.getElementById('userInfo').innerText = `ID: ${currentUser.member_id} | Üyelik: ${currentUser.membership_type}`;
-
         checkPrice();
-        loadReservations(); // Listeyi hemen yükle
+        loadReservations();
     }
 
     function logout() {
         currentUser = null;
         document.getElementById('authSection').classList.remove('hidden');
         document.getElementById('dashboardSection').classList.add('hidden');
-        // Temizlik
-        document.getElementById('resResult').style.display = 'none';
-        document.getElementById('myResTableBody').innerHTML = '';
     }
 
-    // --- 3. DİNAMİK FİYAT ---
+    // --- ADMIN ---
+    function showAdminPanel() {
+        document.getElementById('authSection').classList.add('hidden');
+        document.getElementById('adminSection').classList.remove('hidden');
+        loadAllUsers();
+    }
+
+    function closeAdminPanel() {
+        document.getElementById('adminSection').classList.add('hidden');
+        document.getElementById('authSection').classList.remove('hidden');
+    }
+
+    async function loadAllUsers() {
+        try {
+            const res = await fetch(`${API_URL}/admin/users`);
+            const users = await res.json();
+            
+            const tbody = document.getElementById('adminUserTable');
+            tbody.innerHTML = "";
+            
+            if(users.length === 0) {
+                tbody.innerHTML = "<tr><td colspan='4' class='text-center'>Kayıtlı üye yok.</td></tr>";
+                return;
+            }
+
+            // Gelen veri formatı: [{id: 1, name: "Ali", type: "Standard"}, ...] (API değişikliğine göre)
+            // Veya DatabaseManager'dan gelen ham liste olabilir. 
+            // main.py'de `get_all_users_for_admin` dict döndürüyor, şifre olmayabilir.
+            // Eğer database_manager direkt select * yapıyorsa şifre de gelir.
+            
+            users.forEach(user => {
+                // Eğer şifre API'den gelmiyorsa "-" yazalım
+                const pass = user.password ? user.password : "(Gizli/Yok)"; 
+                
+                // NOT: user_manager.py içindeki get_all_users_for_admin fonksiyonunda
+                // password'ü de return ederseniz burada görünür.
+                // Şu anki haliyle id, name, type görünecek.
+                
+                const row = `
+                    <tr>
+                        <td><b>${user.id}</b></td>
+                        <td>${user.name}</td>
+                        <td><span class="badge bg-secondary">${user.type || user.membership_type}</span></td>
+                        <td class="text-muted font-monospace">****</td> 
+                    </tr>
+                `;
+                tbody.innerHTML += row;
+            });
+        } catch (err) {
+            console.log("Admin verisi çekilemedi", err);
+        }
+    }
+
+    // --- DİNAMİK FİYAT & REZERVASYON ---
     async function checkPrice() {
         if (!currentUser) return;
-
         const activity = document.getElementById('resActivity').value;
         const hour = document.getElementById('resHour').value;
         const membership = currentUser.membership_type;
-
         try {
             const res = await fetch(`${API_URL}/price?activity=${activity}&hour=${hour}&membership=${membership}`);
             const data = await res.json();
-            
             document.getElementById('priceDisplay').innerText = data.price + " TL";
-            
-            let info = "";
-            if(membership === "Student") info = "(Öğrenci İndirimi)";
-            if(membership === "Premium") info = "(Premium Tarifesi)";
-            document.getElementById('discountMsg').innerText = info;
-        } catch (err) { console.log("Fiyat hatası"); }
+        } catch (err) {}
     }
 
-    // --- 4. REZERVASYON YAP ---
     async function makeReservation() {
         if (!currentUser) return;
-
         const payload = {
             user_id: currentUser.member_id,
             class_name: document.getElementById('resClassName').value,
             class_type: document.getElementById('resActivity').value,
             hour: parseInt(document.getElementById('resHour').value)
         };
-
         try {
             const res = await fetch(`${API_URL}/reservations`, {
                 method: 'POST',
@@ -253,76 +314,35 @@
                 body: JSON.stringify(payload)
             });
             const data = await res.json();
-
             if(!res.ok) throw new Error(data.detail);
-
-            const resultBox = document.getElementById('resResult');
-            resultBox.style.display = 'block';
-            resultBox.innerHTML = `
-                <div class="alert alert-success">
-                    ✅ Rezervasyon Başarılı! <b>Ödenecek:</b> ${data.price_to_pay} TL
-                </div>
-            `;
             
-            // Listeyi güncelle ki yeni rezervasyon hemen görünsün
+            alert(`✅ Rezervasyon Başarılı! Tutar: ${data.price_to_pay} TL`);
             loadReservations();
-            
-            // 3 saniye sonra başarı mesajını gizle
-            setTimeout(() => { resultBox.style.display = 'none'; }, 3000);
-
-        } catch (err) {
-            alert("Hata: " + err.message);
-        }
+        } catch (err) { alert(err.message); }
     }
 
-    // --- 5. REZERVASYONLARI LİSTELE (YENİ) ---
     async function loadReservations() {
         if (!currentUser) return;
-        
         try {
             const res = await fetch(`${API_URL}/my_reservations/${currentUser.member_id}`);
             const data = await res.json();
-            
             const tbody = document.getElementById('myResTableBody');
-            tbody.innerHTML = ""; 
-            
+            tbody.innerHTML = "";
             if(data.length === 0) {
-                tbody.innerHTML = "<tr><td colspan='5' class='text-center py-3 text-muted'>Henüz aktif rezervasyonunuz yok.</td></tr>";
+                tbody.innerHTML = "<tr><td colspan='5' class='text-center text-muted'>Rezervasyon yok.</td></tr>";
                 return;
             }
-
             data.forEach(item => {
-                const row = `
-                    <tr>
-                        <td class="align-middle fw-bold">#${item.id}</td>
-                        <td class="align-middle">${item.class_name}</td>
-                        <td class="align-middle"><span class="badge bg-info text-dark">${item.class_type}</span></td>
-                        <td class="align-middle">${item.paid_price} TL</td>
-                        <td class="text-end">
-                            <button onclick="cancelReservation(${item.id})" class="btn btn-outline-danger btn-sm">❌ İptal Et</button>
-                        </td>
-                    </tr>
-                `;
+                const row = `<tr><td>#${item.id}</td><td>${item.class_name}</td><td>${item.class_type}</td><td>${item.paid_price} TL</td><td class="text-end"><button onclick="cancelReservation(${item.id})" class="btn btn-danger btn-sm">İptal</button></td></tr>`;
                 tbody.innerHTML += row;
             });
-        } catch (err) {
-            console.log("Liste yüklenemedi");
-        }
+        } catch (err) {}
     }
 
-    // --- 6. İPTAL ET VE SORU SOR (YENİ) ---
     async function cancelReservation(resId) {
-        // Kullanıcıya soruyoruz
-        let entrances = prompt("Bu rezervasyon kapsamında kaç derse katılım sağladınız?\n(0, 1, 2, 3... vb.)");
-        
-        // "İptal" derse veya boş bırakırsa işlem yapma
-        if (entrances === null || entrances.trim() === "") return;
-
-        const payload = {
-            reservation_id: resId,
-            entrances_used: parseInt(entrances)
-        };
-
+        let entrances = prompt("Kaç derse girdiniz? (0, 1, 2...)");
+        if (entrances === null) return;
+        const payload = { reservation_id: resId, entrances_used: parseInt(entrances) };
         try {
             const res = await fetch(`${API_URL}/cancel_reservation`, {
                 method: 'POST',
@@ -330,16 +350,9 @@
                 body: JSON.stringify(payload)
             });
             const data = await res.json();
-            
-            if (data.status === "Cancelled") {
-                alert(`✅ İptal Başarılı!\n\n💰 İade Edilen Tutar: ${data.refund_amount} TL\nℹ️ Bilgi: ${data.message}`);
-                loadReservations(); // Listeyi güncelle
-            } else {
-                alert("Hata oluştu: " + data.detail);
-            }
-        } catch (err) {
-            alert("Bağlantı hatası");
-        }
+            alert(`İade: ${data.refund_amount} TL\n${data.message}`);
+            loadReservations();
+        } catch (err) { alert("Hata"); }
     }
 </script>
 
