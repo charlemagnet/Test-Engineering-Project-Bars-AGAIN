@@ -52,6 +52,10 @@ class CancellationRequest(BaseModel):
 
 # --- API Endpoints ---
 
+@app.get("/")
+def read_root():
+    return {"message": "Gym System API is running"}
+
 @app.post("/register")
 def register_member(request: RegisterRequest):
     global current_id_counter
@@ -91,6 +95,13 @@ def get_price(activity: str, hour: int, membership: str):
     except KeyError:
         # Eğer ders bulunamazsa (KeyError), 400 hatası döndür
         raise HTTPException(status_code=400, detail="Gecersiz aktivite tipi")
+
+# --- EKLENEN KISIM: Rezervasyon Listeleme Endpoint'i ---
+@app.get("/my_reservations/{user_id}")
+def get_my_reservations(user_id: int):
+    # Kullanıcının rezervasyonlarını sistemden çeker
+    return reservation_system.get_user_reservations(user_id)
+# -------------------------------------------------------
 
 @app.post("/cancel_reservation")
 def cancel_reservation(request: CancellationRequest):

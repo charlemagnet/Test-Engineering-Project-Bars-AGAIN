@@ -12,9 +12,10 @@ class ReservationSystem:
 
     def book_class(self, user_id, gym_class, paid_price):
         if len(gym_class.booked_users) < gym_class.capacity:
+            # Kullanıcıyı derse ekle
             gym_class.booked_users.append(user_id)
             
-            # Rezervasyonu hafızaya kaydet
+            # Rezervasyonu hafızaya (Sözlüğe) kaydet
             res_id = self.res_counter
             self.reservations[res_id] = {
                 "id": res_id,
@@ -34,8 +35,12 @@ class ReservationSystem:
             raise ValueError("Class is full")
 
     def get_user_reservations(self, user_id):
-        # Kullanıcının tüm rezervasyonlarını bulup liste olarak döndür
-        return [res for res in self.reservations.values() if res["user_id"] == user_id]
+        # Kullanıcının ID'sine ait tüm rezervasyonları bul ve liste olarak döndür
+        found_reservations = []
+        for res in self.reservations.values():
+            if res["user_id"] == user_id:
+                found_reservations.append(res)
+        return found_reservations
 
     def cancel_reservation(self, res_id):
         # Rezervasyonu sil
