@@ -47,4 +47,4 @@ jobs:
         # 3. Postman Testlerini Çalıştır (Newman ile)
         # Buradaki dosya isminin repodaki isminle AYNI olduğundan emin ol!
     - name: Run Postman Tests with Newman
-      run: newman run "test.postman_collection.json"        
+      run: newman run "/postman/collections/test.postman_collection.json"        
