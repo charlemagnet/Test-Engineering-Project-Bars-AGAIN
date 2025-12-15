@@ -1,7 +1,5 @@
 import pytest
-import sqlite3
-# Henüz bu dosya yok, import hatası alacağız (Bu beklenen bir durum)
-from Engines import database_manager 
+from Engines.database_manager import DatabaseManager 
 
 @pytest.fixture
 def db():
@@ -10,7 +8,7 @@ def db():
     Test bitince bağlantı kapanır.
     """
     # :memory: parametresi diske yazmadan RAM'de çalışmasını sağlar
-    manager = database_manager.DatabaseManager(":memory:") 
+    manager = DatabaseManager(":memory:") 
     manager.create_tables() # Tabloları oluşturmasını bekliyoruz
     return manager
 
@@ -26,17 +24,21 @@ def test_add_and_get_member(db):
     member_id = 101
     name = "Test User"
     m_type = "Premium"
+    password = "test_password_123" # <--- YENİ: Şifre tanımladık
     
-    db.add_member(member_id, name, m_type)
+    # YENİ: add_member artık 4 parametre alıyor
+    db.add_member(member_id, name, m_type, password)
     
     # 2. Veri Okuma
     fetched_member = db.get_member(member_id)
     
-    # 3. Doğrulama (Tuple döneceğini varsayıyoruz: (id, name, type))
+    # 3. Doğrulama (Tuple döneceğini varsayıyoruz: (id, name, type, password))
     assert fetched_member is not None
     assert fetched_member[0] == member_id
     assert fetched_member[1] == name
     assert fetched_member[2] == m_type
+    # Veritabanından şifrenin de doğru gelip gelmediğini kontrol edelim
+    assert fetched_member[3] == password 
 
 def test_get_non_existent_member(db):
     """Olmayan bir üyeyi sorguladığımızda None dönmeli."""
@@ -45,7 +47,8 @@ def test_get_non_existent_member(db):
 
 def test_delete_member(db):
     """Üye silme işlemini test eder."""
-    db.add_member(202, "Silinecek User", "Standard")
+    # YENİ: Buraya da rastgele bir şifre ("123456") ekledik
+    db.add_member(202, "Silinecek User", "Standard", "123456")
     
     # Önce var olduğunu teyit et
     assert db.get_member(202) is not None

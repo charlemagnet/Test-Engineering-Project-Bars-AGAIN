@@ -6,26 +6,30 @@ class DatabaseManager:
         Veritabanı bağlantısını başlatır.
         db_name: Veritabanı dosyasının adı. Testler için ':memory:' kullanılır.
         """
-        self.connection = sqlite3.connect(db_name)
+        # SQLite'da thread hatası almamak için check_same_thread=False ekliyoruz
+        self.connection = sqlite3.connect(db_name, check_same_thread=False)
         self.cursor = self.connection.cursor()
+        # Tabloları otomatik oluştur (Testlerde kolaylık sağlar)
+        self.create_tables()
 
     def create_tables(self):
-        """Üyeler tablosunu oluşturur."""
+        """Üyeler tablosunu oluşturur (Password sütunu dahil)."""
         self.cursor.execute("""
             CREATE TABLE IF NOT EXISTS members (
                 id INTEGER PRIMARY KEY,
                 name TEXT NOT NULL,
-                membership_type TEXT NOT NULL
+                membership_type TEXT NOT NULL,
+                password TEXT NOT NULL 
             )
         """)
         self.connection.commit()
 
-    def add_member(self, member_id, name, membership_type):
+    def add_member(self, member_id, name, membership_type, password):
         """Yeni bir üye ekler."""
         try:
             self.cursor.execute(
-                "INSERT INTO members (id, name, membership_type) VALUES (?, ?, ?)", 
-                (member_id, name, membership_type)
+                "INSERT INTO members (id, name, membership_type, password) VALUES (?, ?, ?, ?)", 
+                (member_id, name, membership_type, password)
             )
             self.connection.commit()
         except sqlite3.IntegrityError:
@@ -35,6 +39,11 @@ class DatabaseManager:
         """ID'ye göre üyeyi getirir. Bulamazsa None döner."""
         self.cursor.execute("SELECT * FROM members WHERE id=?", (member_id,))
         return self.cursor.fetchone()
+    
+    def get_all_members(self):
+        """Tüm üyeleri listeler (Admin paneli için)."""
+        self.cursor.execute("SELECT * FROM members")
+        return self.cursor.fetchall()
 
     def delete_member(self, member_id):
         """ID'ye göre üyeyi siler."""

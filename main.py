@@ -164,3 +164,9 @@ def make_reservation(request: ReservationRequest):
         return result
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    
+    # --- ADMIN PANELİ (VERİTABANI GÖRÜNTÜLEME) ---
+@app.get("/admin/users")
+def get_all_users():
+    """Veritabanındaki tüm üyeleri listeler."""
+    return member_repo.get_all_users_for_admin()
