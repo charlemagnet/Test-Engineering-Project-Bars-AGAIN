@@ -1,46 +1,40 @@
-import sqlite3
+import pytest
+from Engines.database_manager import DatabaseManager 
 
-class DatabaseManager:
-    def __init__(self, db_name="gym_system.db"):
-        self.db_name = db_name
-        self.connection = None
-        self.connect() # Bağlantıyı aç
+@pytest.fixture
+def db():
+    manager = DatabaseManager(":memory:") 
+    manager.create_tables() 
+    return manager
 
-    def connect(self):
-        self.connection = sqlite3.connect(self.db_name, check_same_thread=False)
-        self.cursor = self.connection.cursor()
+def test_database_connection(db):
+    assert db.connection is not None
 
-    def create_tables(self):
-        # Password sütunu eklendi
-        self.cursor.execute("""
-            CREATE TABLE IF NOT EXISTS members (
-                id INTEGER PRIMARY KEY,
-                name TEXT NOT NULL,
-                membership_type TEXT NOT NULL,
-                password TEXT NOT NULL 
-            )
-        """)
-        self.connection.commit()
-
-    def add_member(self, member_id, name, membership_type, password):
-        try:
-            self.cursor.execute(
-                "INSERT INTO members (id, name, membership_type, password) VALUES (?, ?, ?, ?)", 
-                (member_id, name, membership_type, password)
-            )
-            self.connection.commit()
-        except sqlite3.IntegrityError:
-            raise ValueError(f"Member with ID {member_id} already exists.")
-
-    def get_member(self, member_id):
-        self.cursor.execute("SELECT * FROM members WHERE id=?", (member_id,))
-        return self.cursor.fetchone()
+def test_add_and_get_member(db):
+    member_id = 101
+    name = "Test User"
+    m_type = "Premium"
+    password = "123" # EKLENDİ
     
-    def get_all_members(self):
-        # Arayüzde listelemek için tüm üyeleri çeken fonksiyon
-        self.cursor.execute("SELECT * FROM members")
-        return self.cursor.fetchall()
+    # Şifre parametresi eklendi
+    db.add_member(member_id, name, m_type, password)
+    
+    fetched_member = db.get_member(member_id)
+    
+    assert fetched_member is not None
+    assert fetched_member[0] == member_id
+    assert fetched_member[1] == name
+    assert fetched_member[2] == m_type
+    assert fetched_member[3] == password # EKLENDİ
 
-    def delete_member(self, member_id):
-        self.cursor.execute("DELETE FROM members WHERE id=?", (member_id,))
-        self.connection.commit()
+def test_get_non_existent_member(db):
+    result = db.get_member(9999)
+    assert result is None
+
+def test_delete_member(db):
+    # Şifre parametresi eklendi
+    db.add_member(202, "Silinecek User", "Standard", "pass123")
+    
+    assert db.get_member(202) is not None
+    db.delete_member(202)
+    assert db.get_member(202) is None
