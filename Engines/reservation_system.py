@@ -3,25 +3,43 @@ class GymClass:
         self.name = name
         self.type = type
         self.capacity = capacity
-        self.reserved_users = []
-    
-    @property
-    def current_occupancy(self):
-        return len(self.reserved_users)
+        self.booked_users = []
 
 class ReservationSystem:
-    def book_class(self, user_id, gym_class):
-        if user_id in gym_class.reserved_users:
-            raise ValueError("Already booked")
-            
-        if gym_class.current_occupancy >= gym_class.capacity:
-            raise ValueError("Class is full")
-            
-        gym_class.reserved_users.append(user_id)
-        return {"status": "confirmed", "user_id": user_id, "class": gym_class.name}
+    def __init__(self):
+        self.reservations = {} # Rezervasyonları burada saklayacağız {id: data}
+        self.res_counter = 1   # Rezervasyon ID sayacı
 
-    def cancel_booking(self, user_id, gym_class):
-        if user_id in gym_class.reserved_users:
-            gym_class.reserved_users.remove(user_id)
-            return {"status": "cancelled"}
-        return {"status": "not_found"}
+    def book_class(self, user_id, gym_class, paid_price):
+        if len(gym_class.booked_users) < gym_class.capacity:
+            gym_class.booked_users.append(user_id)
+            
+            # Rezervasyonu hafızaya kaydet
+            res_id = self.res_counter
+            self.reservations[res_id] = {
+                "id": res_id,
+                "user_id": user_id,
+                "class_name": gym_class.name,
+                "class_type": gym_class.type,
+                "paid_price": paid_price
+            }
+            self.res_counter += 1
+            
+            return {
+                "status": "Confirmed", 
+                "message": f"Reservation confirmed for {gym_class.name}",
+                "reservation_id": res_id
+            }
+        else:
+            raise ValueError("Class is full")
+
+    def get_user_reservations(self, user_id):
+        # Kullanıcının tüm rezervasyonlarını bulup liste olarak döndür
+        return [res for res in self.reservations.values() if res["user_id"] == user_id]
+
+    def cancel_reservation(self, res_id):
+        # Rezervasyonu sil
+        if res_id in self.reservations:
+            del self.reservations[res_id]
+            return True
+        return False

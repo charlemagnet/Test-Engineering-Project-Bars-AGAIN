@@ -1,91 +1,151 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
 
-# Engines klasöründeki modülleri içe aktarıyoruz
+# Engines importları
 from Engines.pricing_engine import calculate_dynamic_price
-from Engines.refund_manager import calculate_refund
 from Engines.user_manager import Member, MemberRepository
 from Engines.reservation_system import ReservationSystem, GymClass
 
 app = FastAPI()
 
-# --- Global State (Bellek İçi Veri Tutma) ---
-# Gerçek bir veritabanı yerine şimdilik işlemleri burada tutuyoruz.
+# CORS Ayarı
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Global State
 member_repo = MemberRepository()
 reservation_system = ReservationSystem()
-
-# Testlerde kullanılacak örnek dersler havuzu
 gym_classes = {
     "Yoga Flow": GymClass("Yoga Flow", "Yoga", 20),
     "Boxing Pro": GymClass("Boxing Pro", "Boxing", 15)
 }
 
-# --- Pydantic Modelleri (Gelen Veriyi Doğrulama) ---
-class RefundRequest(BaseModel):
-    activity: str
-    paid_amount: float
-    days_before: float
+# --- Otomatik ID Sayacı ---
+current_id_counter = 1000  # ID'ler 1000'den başlayacak
 
-class MemberRequest(BaseModel):
-    id: int
+# --- Pydantic Modelleri ---
+class RegisterRequest(BaseModel):
     name: str
+    password: str
     membership_type: str
+
+class LoginRequest(BaseModel):
+    member_id: int
+    password: str
 
 class ReservationRequest(BaseModel):
     user_id: int
     class_name: str
     class_type: str
-    capacity: int
+    hour: int # Fiyat hesaplamak için saati de alalım
 
-# --- API Uç Noktaları (Endpoints) ---
+class CancellationRequest(BaseModel):
+    reservation_id: int
+    entrances_used: int
 
-@app.get("/")
-def read_root():
-    """Health check endpoint'i."""
-    return {"message": "Gym System API is running"}
+# --- API Endpoints ---
+
+@app.post("/register")
+def register_member(request: RegisterRequest):
+    global current_id_counter
+    current_id_counter += 1  # Otomatik ID artır
+    new_id = current_id_counter
+    
+    new_member = Member(new_id, request.name, request.membership_type, request.password)
+    member_repo.add_member(new_member)
+    
+    return {
+        "status": "success", 
+        "message": "Kayıt Başarılı!", 
+        "member_id": new_id,
+        "name": new_member.name,
+        "membership_type": new_member.membership_type
+    }
+
+@app.post("/login")
+def login_member(request: LoginRequest):
+    user = member_repo.authenticate(request.member_id, request.password)
+    if user:
+        return {
+            "status": "success", 
+            "member_id": user.id, 
+            "name": user.name, 
+            "membership_type": user.membership_type
+        }
+    else:
+        raise HTTPException(status_code=401, detail="Hatalı ID veya Şifre")
 
 @app.get("/price")
-def get_price(activity: str, hour: int, membership: str = "Standard"):
-    """Fiyat hesaplama endpoint'i."""
-    try:
-        price = calculate_dynamic_price(activity, hour, membership)
-        return {"activity": activity, "price": price}
-    except Exception:
-        # Tanımsız aktiviteler için varsayılan fiyat (Test gereği)
-        return {"activity": activity, "price": 100.0}
+def get_price(activity: str, hour: int, membership: str):
+    # Bu endpoint artık frontend'den gelen üyelik tipini kullanacak
+    price = calculate_dynamic_price(activity, hour, membership)
+    return {"price": price}
 
-@app.post("/refund")
-def process_refund(request: RefundRequest):
-    """İade hesaplama endpoint'i."""
-    try:
-        refund = calculate_refund(request.activity, request.paid_amount, request.days_before)
-        return {"refund_amount": refund}
-    except KeyError:
-         raise HTTPException(status_code=400, detail="Invalid activity type")
+@app.post("/cancel_reservation")
+def cancel_reservation(request: CancellationRequest):
+    # 1. Rezervasyonu bul
+    res_data = reservation_system.reservations.get(request.reservation_id)
+    if not res_data:
+        raise HTTPException(status_code=404, detail="Rezervasyon bulunamadı")
 
-@app.post("/members", status_code=201) # <-- status_code=201 eklendi
-def create_member(request: MemberRequest):
-    """Yeni üye oluşturma endpoint'i."""
-    try:
-        new_member = Member(request.id, request.name, request.membership_type)
-        member_repo.add_member(new_member)
-        return {"status": "Member created", "member_id": new_member.id}
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    class_type = res_data["class_type"]
+    paid_amount = res_data["paid_price"]
+    entrances = request.entrances_used
+
+    # 2. İade Mantığı (User Rule: Before 2 entrances = 100%)
+    refund_amount = 0.0
+    
+    if entrances < 2:
+        # 2 kereden az girmişse (0 veya 1), Tam İade
+        refund_amount = float(paid_amount)
+        message = "2 dersten az katılım olduğu için %100 iade yapıldı."
+    else:
+        # 2 ve üzeri girmişse -> Ceza Oranları (README kuralları)
+        rates = {
+            "Yoga": 0.30,       # %30 geri alır
+            "Boxing": 0.50,     # %50 geri alır
+            "Fitness": 0.10,    # %10 geri alır
+            "Basketball": 0.40, 
+            "Tennis": 0.80,     
+            "Swimming": 0.15    
+        }
+        # Listede olmayan bir dersse varsayılan %0 verelim
+        rate = rates.get(class_type, 0.0)
+        refund_amount = paid_amount * rate
+        message = f"{entrances} ders işlendiği için kesintili iade ({class_type} oranı: %{rate*100})."
+
+    # 3. Sistemden sil
+    reservation_system.cancel_reservation(request.reservation_id)
+
+    return {
+        "status": "Cancelled",
+        "refund_amount": round(refund_amount, 2),
+        "message": message
+    }
 
 @app.post("/reservations")
 def make_reservation(request: ReservationRequest):
-    """Rezervasyon yapma endpoint'i."""
-    # 1. Dersi bul veya oluştur (Test esnekliği için)
     if request.class_name not in gym_classes:
-        gym_classes[request.class_name] = GymClass(request.class_name, request.class_type, request.capacity)
-    
+        gym_classes[request.class_name] = GymClass(request.class_name, request.class_type, 20)
     target_class = gym_classes[request.class_name]
     
-    # 2. Rezervasyonu dene
     try:
-        result = reservation_system.book_class(request.user_id, target_class)
+        # Önce kullanıcının ödeyeceği fiyatı bulalım
+        user = member_repo.get_member(request.user_id)
+        price_to_pay = 100.0 # Varsayılan
+        if user:
+            price_to_pay = calculate_dynamic_price(request.class_type, request.hour, user.membership_type)
+            
+        # Rezervasyon sistemine FİYAT ile birlikte gönderiyoruz
+        result = reservation_system.book_class(request.user_id, target_class, price_to_pay)
+        result["price_to_pay"] = price_to_pay
         return result
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
