@@ -1,40 +1,55 @@
-import pytest
-from Engines.database_manager import DatabaseManager 
+import sqlite3
 
-@pytest.fixture
-def db():
-    manager = DatabaseManager(":memory:") 
-    manager.create_tables() 
-    return manager
+class DatabaseManager:
+    def __init__(self, db_name="gym_system.db"):
+        """
+        Veritabanı bağlantısını başlatır.
+        db_name: Veritabanı dosyasının adı. Testler için ':memory:' kullanılır.
+        """
+        # SQLite'da thread hatası almamak için check_same_thread=False ekliyoruz
+        self.connection = sqlite3.connect(db_name, check_same_thread=False)
+        self.cursor = self.connection.cursor()
+        # Tabloları otomatik oluştur (Testlerde kolaylık sağlar)
+        self.create_tables()
 
-def test_database_connection(db):
-    assert db.connection is not None
+    def create_tables(self):
+        """Üyeler tablosunu oluşturur (Password sütunu dahil)."""
+        self.cursor.execute("""
+            CREATE TABLE IF NOT EXISTS members (
+                id INTEGER PRIMARY KEY,
+                name TEXT NOT NULL,
+                membership_type TEXT NOT NULL,
+                password TEXT NOT NULL 
+            )
+        """)
+        self.connection.commit()
 
-def test_add_and_get_member(db):
-    member_id = 101
-    name = "Test User"
-    m_type = "Premium"
-    password = "123" # EKLENDİ
+    def add_member(self, member_id, name, membership_type, password):
+        """Yeni bir üye ekler."""
+        try:
+            self.cursor.execute(
+                "INSERT INTO members (id, name, membership_type, password) VALUES (?, ?, ?, ?)", 
+                (member_id, name, membership_type, password)
+            )
+            self.connection.commit()
+        except sqlite3.IntegrityError:
+            raise ValueError(f"Member with ID {member_id} already exists.")
+
+    def get_member(self, member_id):
+        """ID'ye göre üyeyi getirir. Bulamazsa None döner."""
+        self.cursor.execute("SELECT * FROM members WHERE id=?", (member_id,))
+        return self.cursor.fetchone()
     
-    # Şifre parametresi eklendi
-    db.add_member(member_id, name, m_type, password)
-    
-    fetched_member = db.get_member(member_id)
-    
-    assert fetched_member is not None
-    assert fetched_member[0] == member_id
-    assert fetched_member[1] == name
-    assert fetched_member[2] == m_type
-    assert fetched_member[3] == password # EKLENDİ
+    def get_all_members(self):
+        """Tüm üyeleri listeler (Admin paneli için)."""
+        self.cursor.execute("SELECT * FROM members")
+        return self.cursor.fetchall()
 
-def test_get_non_existent_member(db):
-    result = db.get_member(9999)
-    assert result is None
+    def delete_member(self, member_id):
+        """ID'ye göre üyeyi siler."""
+        self.cursor.execute("DELETE FROM members WHERE id=?", (member_id,))
+        self.connection.commit()
 
-def test_delete_member(db):
-    # Şifre parametresi eklendi
-    db.add_member(202, "Silinecek User", "Standard", "pass123")
-    
-    assert db.get_member(202) is not None
-    db.delete_member(202)
-    assert db.get_member(202) is None
+    def close(self):
+        """Bağlantıyı kapatır."""
+        self.connection.close()
