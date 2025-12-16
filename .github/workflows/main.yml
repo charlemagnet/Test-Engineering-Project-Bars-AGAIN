@@ -23,28 +23,23 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        # requirements.txt dosyanızın yolunu doğru belirttiğinizden emin olun
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-        # Örnek alt klasör yolu:
-        # pip install -r charlemagnet/test-engineering-project-bars-again/Test-Engineering-Project-Bars-AGAIN-f760ca8ddc9d89fe7edfd6b4a0840315691289cf/requirements.txt
 
     - name: Run Tests with Pytest
       run: |
-        # --cov-fail-under parametresi kaldırıldı.
-        # Artık sadece testlerin geçip geçmediğine bakılacak.
         pytest -v --cov=. --cov-report=term-missing
 
     - name: Install Newman
       run: npm install -g newman
 
-        # 2. API Sunucusunu Arka Planda Başlat
-        # Sonundaki '&' işareti sunucunun arka planda çalışmasını sağlar, böylece bir sonraki adıma geçebiliriz.
     - name: Start API Server
       run: |
-            uvicorn main:app --host 127.0.0.1 --port 8000 &
-            sleep 5 # Sunucunun tam açılması için 5 saniye bekle
+        # ÖNCEKİ DB VARSA SİL (Fresh Start)
+        rm -f gym_system.db
+        
+        # Sunucuyu başlat
+        uvicorn main:app --host 127.0.0.1 --port 8000 &
+        sleep 5
 
-        # 3. Postman Testlerini Çalıştır (Newman ile)
-        # Buradaki dosya isminin repodaki isminle AYNI olduğundan emin ol!
     - name: Run Postman Tests with Newman
-      run: newman run "postman/collections/test.postman_collection.json"        
+      run: newman run "postman/collections/test.postman_collection.json"
