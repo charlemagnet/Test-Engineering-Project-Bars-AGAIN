@@ -18,6 +18,8 @@ def get_base_price(class_type):
 def calculate_dynamic_price(class_type, hour, member_type):
     # get_base_price artık hata fırlatabileceği için burası da güvenli hale geldi
     base_price = get_base_price(class_type)
+    if not (0 <= hour <= 23):
+        raise ValueError(f"Invalid time: {hour}. must be in 0-24")
     
     time_multiplier = 1.0
     if 6 <= hour < 12:
