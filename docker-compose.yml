@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    container_name: gym_backend
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+    environment:
+      - DB_TYPE=postgres
+      - DB_HOST=db
+      - DB_NAME=gym_db
+      - DB_USER=gym_user
+      - DB_PASS=gym_password
+    volumes:
+      - .:/app  # Koddaki değişikliği anlık görmek için (Hot Reload)
+
+  db:
+    image: postgres:15-alpine
+    container_name: gym_postgres
+    restart: always
+    environment:
+      - POSTGRES_DB=gym_db
+      - POSTGRES_USER=gym_user
+      - POSTGRES_PASSWORD=gym_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
