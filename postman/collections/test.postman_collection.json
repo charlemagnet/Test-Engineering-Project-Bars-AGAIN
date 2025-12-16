@@ -1,81 +1,262 @@
 {
-  "info": {
-    "_postman_id": "2d8489e5-d387-49f9-a552-3ba1506cf13b",
-    "name": "test",
-    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
-  },
-  "item": [
-    {
-      "name": "http://127.0.0.1:8000/price",
-      "id": "32b19c71-6ce4-44f4-85df-553f6bda69e8",
-      "request": {
-        "method": "GET",
-        "header": [],
-        "url": {
-          "raw": "http://127.0.0.1:8000/price?activity=activity&hour=9&membership=Standard",
-          "protocol": "http",
-          "host": [
-            "127",
-            "0",
-            "0",
-            "1"
-          ],
-          "port": "8000",
-          "path": [
-            "price"
-          ],
-          "query": [
-            {
-              "key": "activity",
-              "value": "activity",
-              "uuid": "de4ac824-69d0-49d4-8b6c-b6f2ea0c828e"
-            },
-            {
-              "key": "hour",
-              "value": "9",
-              "uuid": "a78eb72a-33f8-49c0-b49b-26286e904de4"
-            },
-            {
-              "key": "membership",
-              "value": "Standard",
-              "uuid": "58ce47cf-5e58-4d8c-8348-8cd8a10e702e"
-            }
-          ]
-        }
-      },
-      "response": []
-    },
-    {
-      "name": "http://127.0.0.1:8000/members",
-      "id": "fde29578-3a15-4ec1-b724-0b5371ed8041",
-      "request": {
-        "method": "POST",
-        "header": [],
-        "body": {
-          "mode": "raw",
-          "raw": "{\r\n  \"id\": 999,\r\n  \"name\": \"Postman User\",\r\n  \"membership_type\": \"Premium\"\r\n}",
-          "options": {
-            "raw": {
-              "language": "json"
-            }
-          }
-        },
-        "url": {
-          "raw": "http://127.0.0.1:8000/members",
-          "protocol": "http",
-          "host": [
-            "127",
-            "0",
-            "0",
-            "1"
-          ],
-          "port": "8000",
-          "path": [
-            "members"
-          ]
-        }
-      },
-      "response": []
-    }
-  ]
+	"info": {
+		"_postman_id": "2d8489e5-d387-49f9-a552-3ba1506cf13b",
+		"name": "Gym Project Tests",
+		"description": "CEN315 Projesi için Positive ve Negative senaryoları içeren otomatik test koleksiyonu.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "1. Register Member (Positive)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"// Status Code 200 mü kontrol et",
+							"pm.test(\"Status code is 200\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"// Dönen ID'yi al ve sonraki testlerde kullanmak üzere kaydet",
+							"var jsonData = pm.response.json();",
+							"pm.test(\"Member ID generated\", function () {",
+							"    pm.expect(jsonData.member_id).to.be.a('number');",
+							"    // Bu ID'yi login testinde kullanacağız",
+							"    pm.collectionVariables.set(\"new_member_id\", jsonData.member_id);",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"name\": \"Newman Test User\",\n  \"password\": \"securePass123\",\n  \"membership_type\": \"Premium\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://127.0.0.1:8000/register",
+					"protocol": "http",
+					"host": [
+						"127",
+						"0",
+						"0",
+						"1"
+					],
+					"port": "8000",
+					"path": [
+						"register"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "2. Login Member (Positive)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Login Successful\", function () {",
+							"    pm.response.to.have.status(200);",
+							"    var jsonData = pm.response.json();",
+							"    pm.expect(jsonData.status).to.eql(\"success\");",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"member_id\": {{new_member_id}},\n  \"password\": \"securePass123\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://127.0.0.1:8000/login",
+					"protocol": "http",
+					"host": [
+						"127",
+						"0",
+						"0",
+						"1"
+					],
+					"port": "8000",
+					"path": [
+						"login"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "3. Get Price (Positive)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Price Calculated\", function () {",
+							"    pm.response.to.have.status(200);",
+							"    pm.expect(pm.response.json().price).to.be.above(0);",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://127.0.0.1:8000/price?activity=Yoga&hour=9&membership=Standard",
+					"protocol": "http",
+					"host": [
+						"127",
+						"0",
+						"0",
+						"1"
+					],
+					"port": "8000",
+					"path": [
+						"price"
+					],
+					"query": [
+						{
+							"key": "activity",
+							"value": "Yoga"
+						},
+						{
+							"key": "hour",
+							"value": "9"
+						},
+						{
+							"key": "membership",
+							"value": "Standard"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "4. Register Missing Pass (Negative)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"// Eksik veri gönderdiğimiz için 422 Unprocessable Entity bekliyoruz",
+							"pm.test(\"Fail on missing password\", function () {",
+							"    pm.response.to.have.status(422);",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"name\": \"Hacker\",\n  \"membership_type\": \"Premium\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://127.0.0.1:8000/register",
+					"protocol": "http",
+					"host": [
+						"127",
+						"0",
+						"0",
+						"1"
+					],
+					"port": "8000",
+					"path": [
+						"register"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "5. Invalid Hour Check (Negative)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"// Saat 25 olamayacağı için 400 veya 500 hatası bekliyoruz",
+							"pm.test(\"Fail on invalid hour\", function () {",
+							"    // FastAPI validasyon hatası verirse 422, logic hatası verirse 400/500 döner",
+							"    // Senin kodunda 'raise ValueError' var, bu genelde 500 döner ama biz hata olduğunu doğrulayalım",
+							"    pm.expect(pm.response.code).to.be.oneOf([400, 422, 500]);",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://127.0.0.1:8000/price?activity=Yoga&hour=25&membership=Standard",
+					"protocol": "http",
+					"host": [
+						"127",
+						"0",
+						"0",
+						"1"
+					],
+					"port": "8000",
+					"path": [
+						"price"
+					],
+					"query": [
+						{
+							"key": "activity",
+							"value": "Yoga"
+						},
+						{
+							"key": "hour",
+							"value": "25"
+						},
+						{
+							"key": "membership",
+							"value": "Standard"
+						}
+					]
+				}
+			},
+			"response": []
+		}
+	],
+	"variable": [
+		{
+			"key": "new_member_id",
+			"value": ""
+		}
+	]
 }
