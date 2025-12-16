@@ -43,8 +43,11 @@ class ReservationSystem:
         return found_reservations
 
     def cancel_reservation(self, res_id):
-        # Rezervasyonu sil
         if res_id in self.reservations:
+            res_data = self.reservations[res_id]
+            user_id = res_data["user_id"]
+            class_name = res_data["class_name"]
+
             del self.reservations[res_id]
             return True
         return False

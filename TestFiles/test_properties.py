@@ -1,6 +1,5 @@
 import pytest
-from hypothesis import given, strategies as st
-from hypothesis import settings, Verbosity
+from hypothesis import given, strategies as st, settings, Verbosity, HealthCheck # HealthCheck eklendi
 from Engines.pricing_engine import calculate_dynamic_price
 
 # Project modules
@@ -11,11 +10,11 @@ from Engines.reservation_system import ReservationSystem, GymClass
 # Refund never negative or exceed paid amount.
 # Refund should be consistent with paid amount.
 
-@settings(max_examples=200) # try 200 random scenarios
+@settings(max_examples=200, suppress_health_check=[HealthCheck.too_slow]) # <-- BU EKLENDİ
 @given(
     class_type=st.sampled_from(["Yoga", "Boxing", "Fitness", "Basketball", "Tennis", "Swimming"]),
-    paid_amount=st.floats(min_value=0.01, max_value=10000.0), # between 0.01 and 10,000
-    days_before=st.floats(min_value=0.0, max_value=365.0)     # between 0 and 365 days
+    paid_amount=st.floats(min_value=0.01, max_value=10000.0),
+    days_before=st.floats(min_value=0.0, max_value=365.0)
 )
 def test_prop_refund_boundaries(class_type, paid_amount, days_before):
     """
