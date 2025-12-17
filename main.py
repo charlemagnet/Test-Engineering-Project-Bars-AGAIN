@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
@@ -9,6 +9,15 @@ from Engines.user_manager import Member, MemberRepository
 from Engines.reservation_system import ReservationSystem, GymClass
 
 app = FastAPI()
+
+# --- GÜVENLİK YAMASI 1: Eksik Security Header'ları Ekleme ---
+# OWASP ZAP'ın "Missing Security Headers" uyarısını çözer.
+@app.middleware("http")
+async def add_security_headers(request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"  # MIME-type sniffing engelleme
+    response.headers["X-Frame-Options"] = "DENY"            # Clickjacking koruması
+    return response
 
 # CORS Ayarı
 app.add_middleware(
@@ -96,7 +105,7 @@ def get_price(activity: str, hour: int, membership: str):
         # Eğer ders bulunamazsa (KeyError), 400 hatası döndür
         raise HTTPException(status_code=400, detail="Gecersiz aktivite tipi")
 
-# --- EKLENEN KISIM: Rezervasyon Listeleme Endpoint'i ---
+# --- Rezervasyon Listeleme Endpoint'i ---
 @app.get("/my_reservations/{user_id}")
 def get_my_reservations(user_id: int):
     # Kullanıcının rezervasyonlarını sistemden çeker
@@ -165,8 +174,15 @@ def make_reservation(request: ReservationRequest):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     
-    # --- ADMIN PANELİ (VERİTABANI GÖRÜNTÜLEME) ---
+# --- GÜVENLİK YAMASI 2: Admin Paneli Kilitleme ---
 @app.get("/admin/users")
-def get_all_users():
-    """Veritabanındaki tüm üyeleri listeler."""
+def get_all_users(x_admin_token: str = Header(None)):
+    """
+    Veritabanındaki tüm üyeleri listeler.
+    GÜVENLİK GÜNCELLEMESİ: Artık sadece 'x-admin-token' başlığına sahip istekler kabul edilir.
+    """
+    # Basit token kontrolü (Fix implemented)
+    if x_admin_token != "super_secret_admin_password_123":
+        raise HTTPException(status_code=401, detail="Yetkisiz Erişim: Token Hatalı!")
+        
     return member_repo.get_all_users_for_admin()
