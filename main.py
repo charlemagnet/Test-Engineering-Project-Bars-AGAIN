@@ -1,4 +1,6 @@
-from fastapi import FastAPI, HTTPException, Header
+import secrets
+from fastapi import FastAPI, HTTPException, Header, Depends, status
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
@@ -36,8 +38,33 @@ gym_classes = {
     "Boxing Pro": GymClass("Boxing Pro", "Boxing", 15)
 }
 
-# --- Otomatik ID Sayacı ---
-current_id_counter = 1000  # ID'ler 1000'den başlayacak
+# --- BUG FIX: ID Sayacı Düzeltmesi ---
+# Sunucu her açıldığında veritabanındaki en son ID'yi bulur ve oradan devam eder.
+# Böylece "Unique constraint failed" hatası asla yaşanmaz.
+existing_users = member_repo.get_all_users_for_admin()
+if existing_users:
+    # Veritabanında üye varsa, en büyük ID'yi bul
+    max_id = max(user["id"] for user in existing_users)
+    current_id_counter = max_id
+else:
+    # Hiç üye yoksa 1000'den başla
+    current_id_counter = 1000
+
+# --- Güvenlik: Admin Basic Auth ---
+security = HTTPBasic()
+
+def get_current_admin(credentials: HTTPBasicCredentials = Depends(security)):
+    # Kullanıcı adı ve şifre kontrolü (Güvenli karşılaştırma için secrets kullanılır)
+    correct_username = secrets.compare_digest(credentials.username, "admin")
+    correct_password = secrets.compare_digest(credentials.password, "admin01")
+    
+    if not (correct_username and correct_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Hatalı Kullanıcı Adı veya Şifre",
+            headers={"WWW-Authenticate": "Basic"},
+        )
+    return credentials.username
 
 # --- Pydantic Modelleri ---
 class RegisterRequest(BaseModel):
@@ -53,7 +80,7 @@ class ReservationRequest(BaseModel):
     user_id: int
     class_name: str
     class_type: str
-    hour: int # Fiyat hesaplamak için saati de alalım
+    hour: int 
 
 class CancellationRequest(BaseModel):
     reservation_id: int
@@ -72,7 +99,13 @@ def register_member(request: RegisterRequest):
     new_id = current_id_counter
     
     new_member = Member(new_id, request.name, request.membership_type, request.password)
-    member_repo.add_member(new_member)
+    
+    # Hata yakalama bloğu ile ekstra güvenlik
+    try:
+        member_repo.add_member(new_member)
+    except ValueError as e:
+        # Nadir de olsa çakışma olursa kullanıcıya düzgün hata dön
+        raise HTTPException(status_code=400, detail=str(e))
     
     return {
         "status": "success", 
@@ -102,19 +135,16 @@ def get_price(activity: str, hour: int, membership: str):
         price = calculate_dynamic_price(activity, hour, membership)
         return {"price": price}
     except KeyError:
-        # Eğer ders bulunamazsa (KeyError), 400 hatası döndür
         raise HTTPException(status_code=400, detail="Gecersiz aktivite tipi")
 
 # --- Rezervasyon Listeleme Endpoint'i ---
 @app.get("/my_reservations/{user_id}")
 def get_my_reservations(user_id: int):
-    # Kullanıcının rezervasyonlarını sistemden çeker
     return reservation_system.get_user_reservations(user_id)
 # -------------------------------------------------------
 
 @app.post("/cancel_reservation")
 def cancel_reservation(request: CancellationRequest):
-    # 1. Rezervasyonu bul
     res_data = reservation_system.reservations.get(request.reservation_id)
     if not res_data:
         raise HTTPException(status_code=404, detail="Rezervasyon bulunamadı")
@@ -123,29 +153,24 @@ def cancel_reservation(request: CancellationRequest):
     paid_amount = res_data["paid_price"]
     entrances = request.entrances_used
 
-    # 2. İade Mantığı (User Rule: Before 2 entrances = 100%)
     refund_amount = 0.0
     
     if entrances < 2:
-        # 2 kereden az girmişse (0 veya 1), Tam İade
         refund_amount = float(paid_amount)
         message = "2 dersten az katılım olduğu için %100 iade yapıldı."
     else:
-        # 2 ve üzeri girmişse -> Ceza Oranları (README kuralları)
         rates = {
-            "Yoga": 0.30,       # %30 geri alır
-            "Boxing": 0.50,     # %50 geri alır
-            "Fitness": 0.10,    # %10 geri alır
+            "Yoga": 0.30,       
+            "Boxing": 0.50,     
+            "Fitness": 0.10,    
             "Basketball": 0.40, 
             "Tennis": 0.80,     
             "Swimming": 0.15    
         }
-        # Listede olmayan bir dersse varsayılan %0 verelim
         rate = rates.get(class_type, 0.0)
         refund_amount = paid_amount * rate
         message = f"{entrances} ders işlendiği için kesintili iade ({class_type} oranı: %{rate*100})."
 
-    # 3. Sistemden sil
     reservation_system.cancel_reservation(request.reservation_id)
 
     return {
@@ -161,28 +186,22 @@ def make_reservation(request: ReservationRequest):
     target_class = gym_classes[request.class_name]
     
     try:
-        # Önce kullanıcının ödeyeceği fiyatı bulalım
         user = member_repo.get_member(request.user_id)
-        price_to_pay = 100.0 # Varsayılan
+        price_to_pay = 100.0 
         if user:
             price_to_pay = calculate_dynamic_price(request.class_type, request.hour, user.membership_type)
             
-        # Rezervasyon sistemine FİYAT ile birlikte gönderiyoruz
         result = reservation_system.book_class(request.user_id, target_class, price_to_pay)
         result["price_to_pay"] = price_to_pay
         return result
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     
-# --- GÜVENLİK YAMASI 2: Admin Paneli Kilitleme ---
+# --- ADMIN PANELI (GÜVENLİ) ---
 @app.get("/admin/users")
-def get_all_users(x_admin_token: str = Header(None)):
+def get_all_users(username: str = Depends(get_current_admin)):
     """
     Veritabanındaki tüm üyeleri listeler.
-    GÜVENLİK GÜNCELLEMESİ: Artık sadece 'x-admin-token' başlığına sahip istekler kabul edilir.
+    Güvenlik: Basic Auth (Kullanıcı Adı: admin, Şifre: admin01) gerektirir.
     """
-    # Basit token kontrolü (Fix implemented)
-    if x_admin_token != "super_secret_admin_password_123":
-        raise HTTPException(status_code=401, detail="Yetkisiz Erişim: Token Hatalı!")
-        
     return member_repo.get_all_users_for_admin()
