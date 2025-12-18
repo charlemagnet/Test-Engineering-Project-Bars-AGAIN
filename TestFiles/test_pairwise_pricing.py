@@ -1,5 +1,5 @@
 import pytest
-# from Engines.pricing_engine import calculate_dynamic_price, get_base_price
+from Engines.pricing_engine import calculate_dynamic_price, get_base_price
 
 # --- PAIRWISE TEST VERİLERİ ---
 # Format: (Activity, Hour, Membership, Expected_Result)
@@ -45,7 +45,5 @@ def test_pairwise_pricing_combinations(activity, hour, membership, expected_pric
     # Act (Eylem)
     actual_price = calculate_dynamic_price(activity, hour, membership)
     
-    # Assert (Doğrulama)
-    # Float hesaplamalarında küçük sapmalar olabileceği için approx kullanıyoruz
     assert actual_price == pytest.approx(expected_price, 0.01), \
         f"HATA: {activity} | {hour}:00 | {membership} -> Beklenen: {expected_price}, Gelen: {actual_price}"
