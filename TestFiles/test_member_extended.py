@@ -1,33 +1,53 @@
 import pytest
 from Engines.user_manager import Member, MemberRepository
 
+# --- Fixture (Hazırlık) ---
 @pytest.fixture
 def member_repo():
     """
-    Testler için geçici (RAM) veritabanı kullanan repository.
-    Diskteki 'gym_system.db' dosyasını etkilemez.
+    Testler için repository oluşturur.
+    PostgreSQL kalıcı olduğu için önce temizlik yapar.
     """
-    # EKLENDİ: db_name=":memory:"
-    repo = MemberRepository(db_name=":memory:")
+    repo = MemberRepository(db_name=":memory:") # İsim sembolik, config'den okur
     
-    # Password eklendi
+    # TEMİZLİK: Önceki testten kalan veri varsa sil
+    # repo.db üzerinden DatabaseManager'ın delete_member fonksiyonuna ulaşıyoruz
+    repo.db.delete_member(1)
+    
+    # Şimdi taze ekle
     repo.add_member(Member(id=1, name="Ali Yilmaz", membership_type="Standard", password="123"))
-    return repo
+    
+    yield repo
+    
+    # TEARDOWN: Test bitince de temizle (Opsiyonel ama iyi olur)
+    repo.db.delete_member(1)
 
-def test_create_all_valid_member_types():
-    # Password eklendi
-    member = Member(id=10, name="Fatma", membership_type="Standard", password="pass")
-    assert member.membership_type == "Standard"
-
-def test_get_existing_member(member_repo):
-    member = member_repo.get_member(1)
-    assert member is not None
-    assert member.name == "Ali Yilmaz"
+# --- Testler ---
 
 def test_add_duplicate_member_id_raises_error(member_repo):
-    # Password eklendi
-    new_member = Member(id=1, name="Mehmet", membership_type="Premium", password="456")
+    """Aynı ID ile kayıt olmaya çalışınca hata vermeli"""
+    # Zaten fixture içinde ID=1 eklendi.
+    # Tekrar eklemeye çalışınca hata bekliyoruz.
+    new_member = Member(id=1, name="Veli", membership_type="Premium", password="456")
     
-    # Veritabanı unique constraint hatası fırlatır (ValueError olarak yakalanıyor mu kontrol etmeliyiz)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError) as excinfo:
         member_repo.add_member(new_member)
+    
+    assert "already exists" in str(excinfo.value)
+
+def test_password_is_stored_correctly(member_repo):
+    """Şifrenin doğru kaydedildiğini doğrula"""
+    user = member_repo.get_member(1)
+    assert user is not None
+    assert user.password == "123"
+
+def test_authenticate_success(member_repo):
+    """Doğru şifre ile giriş"""
+    user = member_repo.authenticate(1, "123")
+    assert user is not None
+    assert user.name == "Ali Yilmaz"
+
+def test_authenticate_failure(member_repo):
+    """Yanlış şifre ile giriş"""
+    user = member_repo.authenticate(1, "YANLIS_SIFRE")
+    assert user is None
