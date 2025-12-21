@@ -6,34 +6,46 @@ class Member:
         self.name = name
         self.membership_type = membership_type
         self.password = password
-        self.is_active = True
 
 class MemberRepository:
-    # EKLENDİ: db_name parametresi varsayılan olarak "gym_system.db"
-    # Ama testlerde ":memory:" gönderebileceğiz.
-    def __init__(self, db_name="gym_system.db"):
-        self.db = DatabaseManager(db_name)
-        self.db.create_tables()
+    def __init__(self):
+        # Artık Mock liste yerine gerçek veritabanını kullanıyoruz
+        self.db = DatabaseManager()
 
     def add_member(self, member):
+        """Veritabanına yeni üye ekler"""
         self.db.add_member(member.id, member.name, member.membership_type, member.password)
 
     def get_member(self, member_id):
+        """Veritabanından üye çeker ve Member objesine çevirir"""
         row = self.db.get_member(member_id)
         if row:
-            return Member(id=row[0], name=row[1], membership_type=row[2], password=row[3])
+            # DÜZELTME: Artık row bir sözlük {"id": 1, "name": ...}
+            return Member(row["id"], row["name"], row["membership_type"], row["password"])
         return None
-    
+
     def authenticate(self, member_id, password):
-        member = self.get_member(member_id)
-        if member and member.password == password:
-            return member
+        """Şifre kontrolü yapar"""
+        row = self.db.authenticate(member_id, password)
+        if row:
+            # DÜZELTME: Index yerine Key kullanıyoruz
+            return Member(row["id"], row["name"], row["membership_type"], row["password"])
         return None
-        
+
+    def delete_member(self, member_id):
+        """Üyeyi siler"""
+        return self.db.delete_member(member_id)
+
     def get_all_users_for_admin(self):
+        """Admin paneli için tüm üyeleri listeler"""
         rows = self.db.get_all_members()
         users = []
         for row in rows:
-             # Tuple: (id, name, type, password)
-             users.append({"id": row[0], "name": row[1], "type": row[2], "password": row[3]})
+            # DÜZELTME BURADA: row[0] yerine row["id"] vb.
+            users.append({
+                "id": row["id"],
+                "name": row["name"],
+                "type": row["membership_type"], # DB'de sütun adı 'membership_type'
+                "password": row["password"]
+            })
         return users

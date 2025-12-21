@@ -7,35 +7,55 @@ class GymClass:
 
 class ReservationSystem:
     def __init__(self):
-        self.reservations = {} # Rezervasyonları burada saklayacağız {id: data}
-        self.res_counter = 1   # Rezervasyon ID sayacı
+        self.reservations = {} # Hold the reservations
+        self.res_counter = 1  # Reservation ID counter
 
     def book_class(self, user_id, gym_class, paid_price):
-        if len(gym_class.booked_users) < gym_class.capacity:
-            # Kullanıcıyı derse ekle
-            gym_class.booked_users.append(user_id)
-            
-            # Rezervasyonu hafızaya (Sözlüğe) kaydet
-            res_id = self.res_counter
-            self.reservations[res_id] = {
-                "id": res_id,
-                "user_id": user_id,
-                "class_name": gym_class.name,
-                "class_type": gym_class.type,
-                "paid_price": paid_price
-            }
-            self.res_counter += 1
-            
-            return {
-                "status": "Confirmed", 
-                "message": f"Reservation confirmed for {gym_class.name}",
-                "reservation_id": res_id
-            }
-        else:
-            raise ValueError("Class is full")
+        # --- [FORMAL VERIFICATION BRIDGE START] ---
+        
+        # 1. PRECONDITION (Ön Koşul):
+        # Check capacity before booking
+        assert len(gym_class.booked_users) < gym_class.capacity, \
+            f"Precondition Failed: Class {gym_class.name} is full! Capacity: {gym_class.capacity}"
+
+        # for postcondition check
+        old_user_count = len(gym_class.booked_users)
+        
+        # --- [ACTION] ---
+        
+        # book the user into the class
+        gym_class.booked_users.append(user_id)
+        
+        res_id = self.res_counter
+        self.reservations[res_id] = {
+            "id": res_id,
+            "user_id": user_id,
+            "class_name": gym_class.name,
+            "class_type": gym_class.type,
+            "paid_price": paid_price
+        }
+        self.res_counter += 1
+        
+        # --- [FORMAL VERIFICATION BRIDGE CONTINUES] ---
+
+        # 2. POSTCONDITION :
+        # Check that the user count has increased by 1
+        new_user_count = len(gym_class.booked_users)
+        assert new_user_count == old_user_count + 1, \
+            f"Postcondition Failed: User count did not increase by 1. Old: {old_user_count}, New: {new_user_count}"
+
+        # 3. INVARIANT (Değişmez Kural):
+        # Fix point for capacity invariant
+        assert len(gym_class.booked_users) <= gym_class.capacity, \
+            f"Invariant Failed: Capacity exceeded! Count: {new_user_count}, Cap: {gym_class.capacity}"
+
+        return {
+            "status": "Confirmed", 
+            "message": f"Reservation confirmed for {gym_class.name}",
+            "reservation_id": res_id
+        }
 
     def get_user_reservations(self, user_id):
-        # Kullanıcının ID'sine ait tüm rezervasyonları bul ve liste olarak döndür
         found_reservations = []
         for res in self.reservations.values():
             if res["user_id"] == user_id:

@@ -1,4 +1,5 @@
 import psycopg2
+from psycopg2.extras import RealDictCursor # <-- BU EKLENDİ
 import os
 import time
 
@@ -20,10 +21,12 @@ class DatabaseManager:
                     host=self.host,
                     database=self.database,
                     user=self.user,
-                    password=self.password
+                    password=self.password,
+                    cursor_factory=RealDictCursor  # <-- ÖNEMLİ: Verileri Sözlük (Dict) olarak döndürür
                 )
                 self.connection.autocommit = True
                 print("✅ PostgreSQL bağlantısı başarılı!")
+                self.create_tables() # Bağlanınca tabloları kontrol et
                 break
             except Exception as e:
                 print(f"⏳ Veritabanına bağlanılamadı, 2 saniye içinde tekrar denenecek... Hata: {e}")
@@ -31,6 +34,7 @@ class DatabaseManager:
 
     def create_tables(self):
         """Tabloları oluşturur"""
+        # cursor_factory zaten connect'te tanımlı olduğu için burada tekrar belirtmeye gerek yok
         with self.connection.cursor() as cursor:
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS members (
@@ -45,27 +49,29 @@ class DatabaseManager:
     def add_member(self, member_id, name, membership_type, password):
         """Yeni üye ekler"""
         with self.connection.cursor() as cursor:
+            # Önce var mı diye kontrol et
             cursor.execute("SELECT id FROM members WHERE id = %s;", (member_id,))
             if cursor.fetchone():
                  raise ValueError(f"Member with ID {member_id} already exists.")
 
+            # Yoksa ekle
             cursor.execute("""
                 INSERT INTO members (id, name, membership_type, password)
                 VALUES (%s, %s, %s, %s);
             """, (member_id, name, membership_type, password))
 
     def get_member(self, member_id):
-        """ID ile üye getirir"""
+        """ID ile üye getirir (Dict döner)"""
         with self.connection.cursor() as cursor:
             cursor.execute("SELECT * FROM members WHERE id = %s;", (member_id,))
-            return cursor.fetchone()
+            return cursor.fetchone() # Artık {id: 1, name: '...'} formatında döner
 
-    # --- EKLENEN FONKSİYON ---
     def delete_member(self, member_id):
-        """Üyeyi siler (Testler için gerekli)"""
+        """Üyeyi siler (Testler ve temizlik için gerekli)"""
         with self.connection.cursor() as cursor:
             cursor.execute("DELETE FROM members WHERE id = %s;", (member_id,))
-            
+            return True # Silme işlemi başarılı kabul edilir
+
     def authenticate(self, member_id, password):
         """Giriş kontrolü"""
         with self.connection.cursor() as cursor:
@@ -77,3 +83,8 @@ class DatabaseManager:
         with self.connection.cursor() as cursor:
             cursor.execute("SELECT * FROM members;")
             return cursor.fetchall()
+            
+    def close(self):
+        """Bağlantıyı kapatır"""
+        if self.connection:
+            self.connection.close()

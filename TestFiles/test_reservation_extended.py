@@ -40,12 +40,10 @@ def test_capacity_at_limit_success(reservation_system, small_class):
     assert len(small_class.booked_users) == small_class.capacity
 
 def test_capacity_overflow_raises_error(reservation_system, small_class):
-    # Kapasiteyi doldur
     for i in range(1, small_class.capacity + 1):
         reservation_system.book_class(i, small_class, paid_price=50.0)
-    
-    # Kapasite doluyken eklemeye çalışınca hata vermeli
-    with pytest.raises(ValueError, match="Class is full"):
+
+    with pytest.raises(AssertionError):
         reservation_system.book_class(1001, small_class, paid_price=50.0)
 
 def test_prevent_double_booking_raises_error(reservation_system, yoga_class):

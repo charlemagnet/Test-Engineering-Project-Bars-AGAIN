@@ -1,5 +1,5 @@
 import pytest
-
+from Engines.reservation_system import ReservationSystem, GymClass
 
 def test_formal_precondition_enforcement():
     """
