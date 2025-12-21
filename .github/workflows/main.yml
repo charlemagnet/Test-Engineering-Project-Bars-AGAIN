@@ -10,6 +10,24 @@ jobs:
   build-and-test:
     runs-on: ubuntu-latest
 
+    # --- KRİTİK EKLEME: PostgreSQL Servisi ---
+    # Bu bölüm, testler çalışırken arkada geçici bir veritabanı açar.
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: admin
+          POSTGRES_PASSWORD: password123
+          POSTGRES_DB: gym_db
+        ports:
+          - 5432:5432
+        # Veritabanının hazır olmasını bekleyen sağlık kontrolü
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -26,20 +44,30 @@ jobs:
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
     - name: Run Tests with Pytest
+      # Veritabanı bağlantı bilgilerini environment variable olarak veriyoruz
+      env:
+        DB_HOST: localhost
+        DB_USER: admin
+        DB_PASSWORD: password123
+        DB_NAME: gym_db
       run: |
         pytest -v --cov=. --cov-report=term-missing
 
     - name: Install Newman
       run: npm install -g newman
 
-    - name: Start API Server
+    - name: Start API Server & Run Postman Tests
+      env:
+        DB_HOST: localhost
+        DB_USER: admin
+        DB_PASSWORD: password123
+        DB_NAME: gym_db
       run: |
-        # ÖNCEKİ DB VARSA SİL (Fresh Start)
-        rm -f gym_system.db
-        
-        # Sunucuyu başlat
+        # API'yi arka planda başlat
         uvicorn main:app --host 127.0.0.1 --port 8000 &
+        
+        # Server'ın kalkması için 5 saniye bekle
         sleep 5
-
-    - name: Run Postman Tests with Newman
-      run: newman run "postman/collections/test.postman_collection.json"
+        
+        # Postman testlerini çalıştır
+        newman run "postman/collections/test.postman_collection.json"
