@@ -1,53 +1,59 @@
 import pytest
-from Engines.user_manager import Member, MemberRepository
+from Engines.user_manager import MemberRepository, Member
 
-# --- Fixture (Hazırlık) ---
+# --- TEST KURULUMU (FIXTURE) ---
 @pytest.fixture
 def member_repo():
     """
     Testler için repository oluşturur.
-    PostgreSQL kalıcı olduğu için önce temizlik yapar.
+    Her testten önce veritabanını temizler (Truncate) ki çakışma olmasın.
     """
-    repo = MemberRepository(db_name=":memory:") # İsim sembolik, config'den okur
+    repo = MemberRepository() # Artık parametre almıyor!
     
-    # TEMİZLİK: Önceki testten kalan veri varsa sil
-    # repo.db üzerinden DatabaseManager'ın delete_member fonksiyonuna ulaşıyoruz
-    repo.db.delete_member(1)
+    # Veritabanını Temizle (Clean Slate)
+    with repo.db.connection.cursor() as cursor:
+        cursor.execute("TRUNCATE TABLE members CASCADE;")
+        # repo.db.connection.commit() # Autocommit açık olduğu için gerek yok ama zararı da yok
     
-    # Şimdi taze ekle
-    repo.add_member(Member(id=1, name="Ali Yilmaz", membership_type="Standard", password="123"))
-    
-    yield repo
-    
-    # TEARDOWN: Test bitince de temizle (Opsiyonel ama iyi olur)
-    repo.db.delete_member(1)
+    return repo
 
-# --- Testler ---
+# --- TESTLER ---
 
 def test_add_duplicate_member_id_raises_error(member_repo):
-    """Aynı ID ile kayıt olmaya çalışınca hata vermeli"""
-    # Zaten fixture içinde ID=1 eklendi.
-    # Tekrar eklemeye çalışınca hata bekliyoruz.
-    new_member = Member(id=1, name="Veli", membership_type="Premium", password="456")
+    # 1. Üye ekle
+    m1 = Member(101, "Original", "Standard", "pass1")
+    member_repo.add_member(m1)
     
-    with pytest.raises(ValueError) as excinfo:
-        member_repo.add_member(new_member)
+    # 2. Aynı ID ile tekrar eklemeye çalış
+    m2 = Member(101, "Duplicate", "Premium", "pass2")
     
-    assert "already exists" in str(excinfo.value)
+    # 3. Hata vermeli
+    with pytest.raises(ValueError, match="already exists"):
+        member_repo.add_member(m2)
 
 def test_password_is_stored_correctly(member_repo):
-    """Şifrenin doğru kaydedildiğini doğrula"""
-    user = member_repo.get_member(1)
-    assert user is not None
-    assert user.password == "123"
+    member = Member(202, "Secure User", "Premium", "secret_pass")
+    member_repo.add_member(member)
+    
+    # Veritabanından geri çek
+    retrieved = member_repo.get_member(202)
+    
+    # Şifre doğru mu?
+    assert retrieved.password == "secret_pass"
 
 def test_authenticate_success(member_repo):
-    """Doğru şifre ile giriş"""
-    user = member_repo.authenticate(1, "123")
-    assert user is not None
-    assert user.name == "Ali Yilmaz"
+    member = Member(303, "Auth User", "Standard", "my_password")
+    member_repo.add_member(member)
+    
+    # Doğru şifreyle giriş
+    result = member_repo.authenticate(303, "my_password")
+    assert result is not None
+    assert result.name == "Auth User"
 
 def test_authenticate_failure(member_repo):
-    """Yanlış şifre ile giriş"""
-    user = member_repo.authenticate(1, "YANLIS_SIFRE")
-    assert user is None
+    member = Member(404, "Hacker Target", "Standard", "strong_pass")
+    member_repo.add_member(member)
+    
+    # Yanlış şifreyle giriş
+    result = member_repo.authenticate(404, "wrong_pass")
+    assert result is None

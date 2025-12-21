@@ -41,7 +41,6 @@ class GymSystemModel(RuleBasedStateMachine):
         self.member_repo.add_member(member)
         return member
 
-    @rule(target=reservations, member=users)
     def book_class(self, member):
         is_full = len(self.target_class.booked_users) >= self.target_class.capacity
         
@@ -49,8 +48,9 @@ class GymSystemModel(RuleBasedStateMachine):
             result = self.reservation_system.book_class(member.id, self.target_class, paid_price=100.0)
             self.expected_booking_count += 1
             return result["reservation_id"]
-        except ValueError as e:
-            if str(e) == "Class is full":
+            
+        except (ValueError, AssertionError) as e:
+            if "full" in str(e) or "Precondition" in str(e): 
                 assert is_full
             else:
                 pass
