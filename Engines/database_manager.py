@@ -30,9 +30,8 @@ class DatabaseManager:
                 time.sleep(2)
 
     def create_tables(self):
-        """Tabloları oluşturur (PostgreSQL Syntax: SERIAL PRIMARY KEY)"""
+        """Tabloları oluşturur"""
         with self.connection.cursor() as cursor:
-            # Members Tablosu
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS members (
                     id SERIAL PRIMARY KEY,
@@ -41,18 +40,11 @@ class DatabaseManager:
                     password VARCHAR(100)
                 );
             """)
-            
-            # Reservations Tablosu (Opsiyonel, varsa ekle)
-            # cursor.execute(...)
-            
             print("✅ Tablolar hazır.")
 
     def add_member(self, member_id, name, membership_type, password):
-        """Yeni üye ekler (Placeholder: %s)"""
-        # Not: PostgreSQL SERIAL kullandığı için ID'yi manuel vermemize gerek yok aslında
-        # ama senin ID mantığını (1000'den başlatma) korumak için ID'yi de insert edebiliriz.
+        """Yeni üye ekler"""
         with self.connection.cursor() as cursor:
-            # Önce bu ID var mı kontrol et (Manual ID management)
             cursor.execute("SELECT id FROM members WHERE id = %s;", (member_id,))
             if cursor.fetchone():
                  raise ValueError(f"Member with ID {member_id} already exists.")
@@ -68,6 +60,12 @@ class DatabaseManager:
             cursor.execute("SELECT * FROM members WHERE id = %s;", (member_id,))
             return cursor.fetchone()
 
+    # --- EKLENEN FONKSİYON ---
+    def delete_member(self, member_id):
+        """Üyeyi siler (Testler için gerekli)"""
+        with self.connection.cursor() as cursor:
+            cursor.execute("DELETE FROM members WHERE id = %s;", (member_id,))
+            
     def authenticate(self, member_id, password):
         """Giriş kontrolü"""
         with self.connection.cursor() as cursor:
@@ -75,7 +73,7 @@ class DatabaseManager:
             return cursor.fetchone()
 
     def get_all_members(self):
-        """Tüm üyeleri listeler (Admin için)"""
+        """Tüm üyeleri listeler"""
         with self.connection.cursor() as cursor:
             cursor.execute("SELECT * FROM members;")
             return cursor.fetchall()
